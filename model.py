@@ -4,21 +4,18 @@ from torch_geometric.nn import GCNConv, GAT
 
 
 class HAGNET(nn.Module):
-    def __init__(self, n_genes, filter_g, filter_d, loss_t_weight):
+    def __init__(self, n_genes, filter_g, filter_d, n_layers_ta, loss_t_weight):
         super(HAGNET, self).__init__()
-        self.n_genes = n_genes
         self.n_timestamps = filter_g[0]
-        self.filter_g = filter_g
-        self.filter_d = filter_d
         self.loss_t_weight = loss_t_weight
 
         # Global graph module
-        self.gcn_encoder = GCN_Encoder(self.filter_g)
-        self.decoder_g = Decoder_G(self.filter_g[::-1])
+        self.gcn_encoder = GCN_Encoder(filter_g)
+        self.decoder_g = Decoder_G(filter_g[::-1])
 
         # Dynamic graphs module
-        self.ta_gat_encoder = TA_GAT_Encoder(self.filter_d, self.n_genes, self.n_timestamps)
-        self.decoder_d = Decoder_D(self.filter_d[::-1], self.n_timestamps)
+        self.ta_gat_encoder = TA_GAT_Encoder(filter_d, n_genes, self.n_timestamps, n_layers_ta)
+        self.decoder_d = Decoder_D(filter_d[::-1], self.n_timestamps)
 
     def forward(self, x_g, edges_g, weights, x_d, edges_d):
         x_g_encoded = self.gcn_encoder(x_g, edges_g, weights)
@@ -36,10 +33,9 @@ class GCN_Encoder(nn.Module):
     def __init__(self, filter):
         super(GCN_Encoder, self).__init__()
 
-        self.filter = filter
-        self.n_layers = len(self.filter) - 1
+        self.n_layers = len(filter) - 1
 
-        self.gcn_layer = nn.ModuleList([GCNConv(self.filter[i], self.filter[i+1], 1) for i in range(self.n_layers)])
+        self.gcn_layer = nn.ModuleList([GCNConv(filter[i], filter[i+1], 1) for i in range(self.n_layers)])
 
         for i in range(self.n_layers):
             self.gcn_layer[i].apply(self._init_weights)
@@ -67,10 +63,9 @@ class Decoder_G(nn.Module):
     def __init__(self, filter):
         super(Decoder_G, self).__init__()
 
-        self.filter = filter
-        self.n_layers = len(self.filter) - 1
+        self.n_layers = len(filter) - 1
 
-        self.linear_layer = nn.ModuleList([nn.Linear(self.filter[i], self.filter[i + 1]) for i in range(self.n_layers)])
+        self.linear_layer = nn.ModuleList([nn.Linear(filter[i], filter[i + 1]) for i in range(self.n_layers)])
 
         for i in range(self.n_layers):
             self.linear_layer[i].apply(self._init_weights)
@@ -101,16 +96,14 @@ class Decoder_G(nn.Module):
 
 
 class TA_GAT_Encoder(nn.Module):
-    def __init__(self, filter, n_genes, n_timestamps):
+    def __init__(self, filter, n_genes, n_timestamps, n_layers_ta):
         super(TA_GAT_Encoder, self).__init__()
 
-        self.filter = filter
-        self.n_layers = len(self.filter) - 1
-        self.n_genes = n_genes
+        self.n_layers = len(filter) - 1
         self.n_timestamps = n_timestamps
 
-        self.gat_layer = nn.ModuleList([nn.ModuleList([GAT(self.filter[i], self.filter[i+1], 1) for _ in range(self.n_timestamps-1)]) for i in range(self.n_layers)])
-        self.ta_layer = nn.ModuleList([nn.ModuleList([self.ta_module(self.n_genes, self.filter[i+1]) for _ in range(self.n_timestamps - 2)]) for i in range(self.n_layers)])
+        self.gat_layer = nn.ModuleList([nn.ModuleList([GAT(filter[i], filter[i+1], 1) for _ in range(self.n_timestamps-1)]) for i in range(self.n_layers)])
+        self.ta_layer = nn.ModuleList([nn.ModuleList([self.ta_module(n_genes, filter[i+1], n_layers_ta) for _ in range(self.n_timestamps - 2)]) for i in range(self.n_layers)])
 
         for i in range(self.n_layers):
             for j in range(self.n_timestamps - 1):
@@ -163,15 +156,22 @@ class TA_GAT_Encoder(nn.Module):
         x = torch.stack(x_new)
         return x
 
-    def ta_module(self, input_dim, hidden_dim):
-        ta_block = nn.Sequential(
-            nn.Conv1d(in_channels=input_dim, out_channels=input_dim, kernel_size=1, padding=0),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(inplace=True),
+    def ta_module(self, input_dim, hidden_dim, n_layers):
+        layers = []
+
+        for _ in range(n_layers-1):
+            layers.extend([
+                nn.Conv1d(in_channels=input_dim, out_channels=input_dim, kernel_size=1, padding=0),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(inplace=True)
+            ])
+        layers.extend([
             nn.Conv1d(in_channels=input_dim, out_channels=input_dim, kernel_size=1, padding=0),
             nn.BatchNorm1d(hidden_dim),
             nn.Sigmoid()
-        )
+        ])
+
+        ta_block = nn.Sequential(*layers)
         return ta_block
 
 
@@ -179,11 +179,10 @@ class Decoder_D(nn.Module):
     def __init__(self, filter, n_timestamps):
         super(Decoder_D, self).__init__()
 
-        self.filter = filter
-        self.n_layers = len(self.filter) - 1
+        self.n_layers = len(filter) - 1
         self.n_timestamps = n_timestamps
 
-        self.linear_layer = nn.ModuleList([nn.ModuleList([nn.Linear(self.filter[i], self.filter[i+1]) for _ in range(self.n_timestamps-1)]) for i in range(self.n_layers)])
+        self.linear_layer = nn.ModuleList([nn.ModuleList([nn.Linear(filter[i], filter[i+1]) for _ in range(self.n_timestamps-1)]) for i in range(self.n_layers)])
         for i in range(self.n_layers):
             for j in range(self.n_timestamps - 1):
                 self.linear_layer[i][j].apply(self._init_weights)
