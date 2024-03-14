@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_path', default='clusters.txt')
     parser.add_argument('--n_layers_g', type=int, default=1)
     parser.add_argument('--n_layers_d', type=int, default=2)
+    parser.add_argument('--n_layers_ta', type=int, default=2)
     parser.add_argument('--threshold_g', type=float, default=0.98)
     parser.add_argument('--threshold_d', type=float, default=0.5)
     parser.add_argument('--loss_t_weight', type=float, default=0.5)
@@ -48,7 +49,7 @@ if __name__ == '__main__':
         edges_d.append(utils.nearest_neighbors(gene_expression, args.threshold_d))
 
     # Initialize the model
-    hagnet_model = model.HAGNET(n_genes, filter_g, filter_d, args.loss_t_weight)
+    hagnet_model = model.HAGNET(n_genes, filter_g, filter_d, args.n_layers_ta, args.loss_t_weight)
     optimizer = torch.optim.Adam(hagnet_model.parameters(), lr=args.lr)
 
     print('***** Training the model *****')
