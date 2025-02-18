@@ -6,7 +6,7 @@ Synthetic I dataset
 --n_layers_ta 1
 --threshold_g 0.98
 --threshold_d 0.5
---loss_t_weight 0.1
+--loss_t_weight 1
 --lr 0.01
 --epochs 20
 
@@ -16,7 +16,7 @@ Synthetic II dataset
 --n_layers_ta 2
 --threshold_g 0.98
 --threshold_d 0.5
---loss_t_weight 0.4
+--loss_t_weight 1
 --lr 0.01
 --epochs 20
 
@@ -46,7 +46,7 @@ A. gambiae dataset
 --n_layers_ta 3
 --threshold_g 0.98
 --threshold_d 0.5
---loss_t_weight 0.9
+--loss_t_weight 1
 --lr 0.01
 --epochs 20
 
@@ -56,7 +56,7 @@ Yeast dataset
 --n_layers_ta 4
 --threshold_g 0.98
 --threshold_d 0.5
---loss_t_weight 1
+--loss_t_weight 0.7
 --lr 0.01
 --epochs 20
 
@@ -66,6 +66,6 @@ AGS dataset
 --n_layers_ta 5
 --threshold_g 0.98
 --threshold_d 0.5
---loss_t_weight 1
+--loss_t_weight 0.1
 --lr 0.01
 --epochs 20
